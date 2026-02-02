@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PaceMaker Pro - Stable</title>
+    <style>
+        :root { --uber: #000; --rocket: #ff5a00; --menu: #ff0044; --wolt: #00c1e8; --bg: #f2f7f5; --acc: #7fb6a4; }
+        body { font-family: sans-serif; margin: 0; background: var(--bg); color: #2c3e50; padding-bottom: 50px; }
+        .container { max-width: 500px; margin: auto; padding: 15px; }
+        .pace-card { background: var(--acc); color: white; border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 15px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 15px; }
+        .stat-box { background: white; padding: 10px 2px; border-radius: 12px; text-align: center; font-size: 0.65rem; box-shadow: 0 2px 6px rgba(0,0,0,0.04); cursor: pointer; }
+        .stat-box b { display: block; font-size: 0.85rem; color: var(--acc); margin-top: 3px; }
+        .card { background: white; border-radius: 16px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        input { width: 100%; padding: 12px; border: 1.5px solid #e0e0e0; border-radius: 10px; box-sizing: border-box; font-size: 1rem; margin-bottom: 10px; }
+        .date-area { background: #eef5f2; padding: 12px; border-radius: 10px; margin-bottom: 15px; border: 1.5px solid var(--acc); }
+        .count-selector { display: flex; align-items: center; justify-content: center; gap: 25px; margin: 15px 0; }
+        .count-btn { width: 48px; height: 48px; border-radius: 50%; border: none; background: var(--acc); color: white; font-size: 1.5rem; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .pf-btn { padding: 16px; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        .history-item { display: flex; justify-content: space-between; padding: 15px; margin-bottom: 8px; background: #fff; border-left: 6px solid; border-radius: 10px; font-weight: bold; }
+        #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-content { background: white; width: 85%; max-width: 380px; border-radius: 20px; padding: 20px; }
+        .modal-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; font-weight: bold; }
+        .manage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .manage-btn { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="pace-card"><div id="paceStatus" style="font-size:1.6rem; font-weight:bold;">集計中...</div></div>
+    
+    <div class="stats-grid">
+        <div class="stat-box" onclick="showAnalysis('day')">今日<b id="dTot">0円</b></div>
+        <div class="stat-box" onclick="showAnalysis('week')">今週<b id="wTot">0円</b></div>
+        <div class="stat-box" onclick="showAnalysis('cash')">現金<b id="dCsh" style="color:#e67e22;">0円</b></div>
+        <div class="stat-box" onclick="showAnalysis('month')">今月<b id="mTot">0円</b></div>
+    </div>
+
+    <div class="card">
+        <div class="date-area">📅 <input type="date" id="targetDate" style="border:none; background:none; font-weight:bold; color:var(--acc); font-size:1rem;"></div>
+        <div style="display:flex; gap:8px;">
+            <input type="number" id="fee" placeholder="報酬" inputmode="numeric">
+            <input type="number" id="bonus" placeholder="チップ" inputmode="numeric">
+            <input type="number" id="cash" placeholder="現金" inputmode="numeric">
+        </div>
+        <div class="count-selector">
+            <button class="count-btn" onclick="chCount(-1)">−</button>
+            <div style="font-size:1.3rem; font-weight:bold;"><span id="delCount">1</span>件</div>
+            <button class="count-btn" onclick="chCount(1)">＋</button>
+        </div>
+        <div class="btn-grid">
+            <button class="pf-btn" style="background:var(--uber)" onclick="add('Uber')">UberEats</button>
+            <button class="pf-btn" style="background:var(--rocket)" onclick="add('RocketNow')">RocketNow</button>
+            <button class="pf-btn" style="background:var(--menu)" onclick="add('menu')">menu</button>
+            <button class="pf-btn" style="background:var(--wolt)" onclick="add('Wolt')">Wolt</button>
+        </div>
+        <button onclick="undo()" style="width:100%; margin-top:12px; padding:12px; border-radius:10px; border:none; background:#bdc3c7; color:white; font-weight:bold; cursor:pointer;">↩︎ 直前の取り消し</button>
+    </div>
+
+    <div class="card"><div id="listTitle" style="font-weight:bold; color:var(--acc); margin-bottom:12px;">📝 内訳</div><div id="list"></div></div>
+
+    <div class="card" style="background:#f9fbfb;">
+        <div class="manage-grid">
+            <button class="manage-btn" onclick="cp()">📄 データをコピー</button>
+            <button class="manage-btn" onclick="im()">📥 復元(貼り付け)</button>
+            <button class="manage-btn" onclick="dl()" style="grid-column: span 2; background:#eef5f2; border-color:var(--acc); color:var(--acc);">📊 CSVダウンロード</button>
+            <button class="manage-btn" onclick="cl()" style="grid-column: span 2; color:#ff4444; border-color:#ffcccc;">⚠️ 全データリセット</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal" onclick="this.style.display='none'">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <h3 id="modalTitle" style="margin-top:0; color:var(--acc); text-align:center;">📊 集計内訳</h3>
+        <div id="modalBody"></div>
+        <button onclick="document.getElementById('modal').style.display='none'" style="width:100%; margin-top:15px; padding:12px; border:none; background:var(--acc); color:white; border-radius:10px; font-weight:bold;">閉じる</button>
+    </div>
+</div>
+
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbw-6zwmTr3GXDn-4j0kxGlZAkiwxKA98ozSLvVnOlVNL2emdqMXnNreL1B-tarRBvdB/exec";
+    
+    let db = JSON.parse(localStorage.getItem('db_goal_v8')) || [];
+    const colors = {Uber:'#000', RocketNow:'#ff5a00', menu:'#ff0044', Wolt:'#00c1e8'};
+    let curCnt = 1;
+
+    function getLogicToday() {
+        const d = new Date();
+        if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    window.onload = () => { 
+        document.getElementById('targetDate').value = getLogicToday(); 
+        render(); 
+    };
+    document.getElementById('targetDate').onchange = render;
+
+    async function sendToSheet(data) {
+        if(!GAS_URL) return;
+        try { 
+            fetch(GAS_URL, { 
+                method: "POST", 
+                mode: "no-cors", 
+                body: JSON.stringify(data) 
+            }); 
+        } catch (e) { console.error("GAS送信失敗", e); }
+    }
+
+    function showAnalysis(type) {
+        const baseDateStr = document.getElementById('targetDate').value;
+        const baseDate = new Date(baseDateStr);
+        let target = [];
+        let title = "";
+
+        if(type==='day') {
+            target = db.filter(r => r.date === baseDateStr);
+            title = "本日の内訳";
+        } else if(type==='cash') {
+            target = db.filter(r => r.date === baseDateStr && r.cash > 0);
+            title = "本日の現金受領";
+        } else if(type==='month') {
+            target = db.filter(r => r.date.substring(0,7) === baseDateStr.substring(0,7));
+            title = "当月の合計内訳";
+        } else if(type==='week') {
+            const d = new Date(baseDate);
+            const diff = (d.getDay() === 0 ? 6 : d.getDay() - 1);
+            d.setDate(d.getDate() - diff);
+            const startW = d.toISOString().split('T')[0];
+            target = db.filter(r => r.date >= startW && r.date <= baseDateStr);
+            title = "今週の合計内訳";
+        }
+
+        const summary = target.reduce((acc, cur) => {
+            if(!acc[cur.pf]) acc[cur.pf] = {count:0, total:0};
+            acc[cur.pf].count += (cur.count || 0);
+            acc[cur.pf].total += (cur.fee + cur.bonus);
+            return acc;
+        }, {});
+
+        const body = document.getElementById('modalBody');
+        body.innerHTML = '';
+        if(Object.keys(summary).length === 0) {
+            body.innerHTML = "<p style='text-align:center;color:#999;'>データなし</p>";
+        } else {
+            Object.entries(summary).forEach(([pf, data]) => {
+                body.innerHTML += `<div class="modal-row" style="color:${colors[pf]}"><span>${pf} (${data.count}件)</span><span>${data.total.toLocaleString()}円</span></div>`;
+            });
+        }
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    function chCount(v) { 
+        curCnt = Math.max(0, curCnt + v); 
+        document.getElementById('delCount').innerText = curCnt; 
+    }
+
+    function add(pf) {
+        const f = parseInt(document.getElementById('fee').value)||0, b = parseInt(document.getElementById('bonus').value)||0, c = parseInt(document.getElementById('cash').value)||0;
+        const d = document.getElementById('targetDate').value;
+        const gid = Date.now();
+        
+        const row = { id:gid, date:d, pf, fee:f, bonus:b, cash:c, count:curCnt, gid };
+        db.push(row);
+        localStorage.setItem('db_goal_v8', JSON.stringify(db));
+        
+        sendToSheet(row);
+
+        document.getElementById('fee').value=''; document.getElementById('bonus').value=''; document.getElementById('cash').value='';
+        curCnt = 1; document.getElementById('delCount').innerText = '1'; render();
+    }
+
+    function render() {
+        const baseDateStr = document.getElementById('targetDate').value;
+        const list = document.getElementById('list'); list.innerHTML = '';
+        let dTot=0, dCsh=0, wTot=0, mTot=0, dCnt=0;
+
+        const dObj = new Date(baseDateStr);
+        const diff = (dObj.getDay() === 0 ? 6 : dObj.getDay() - 1);
+        dObj.setDate(dObj.getDate() - diff);
+        const startW = dObj.toISOString().split('T')[0];
+
+        db.forEach(r => {
+            const val = r.fee + r.bonus;
+            if(r.date === baseDateStr) { dTot += val; dCsh += (r.cash||0); dCnt += (r.count||0); }
+            if(r.date >= startW && r.date <= baseDateStr) wTot += val;
+            if(r.date.substring(0,7) === baseDateStr.substring(0,7)) mTot += val;
+            
+            if(r.date === baseDateStr) {
+                const div = document.createElement('div');
+                div.className = 'history-item'; div.style.borderLeftColor = colors[r.pf]; div.style.color = colors[r.pf];
+                div.innerHTML = `<span>${r.pf}</span><span>${val}円 ${r.cash?`<small style="color:#e67e22;">(現:${r.cash})</small>`:''}<small style="color:#888;margin-left:5px;">(${r.count}件)</small></span>`;
+                div.onclick = () => { if(confirm('削除？')){ db=db.filter(x=>x.id!==r.id); localStorage.setItem('db_goal_v8', JSON.stringify(db)); render(); } };
+                list.prepend(div);
+            }
+        });
+        document.getElementById('dTot').innerText = dTot+'円'; document.getElementById('wTot').innerText = wTot+'円';
+        document.getElementById('dCsh').innerText = dCsh+'円'; document.getElementById('mTot').innerText = mTot+'円';
+        const ry = Math.max(0, 12500 - dTot); const rc = Math.max(0, 22 - dCnt);
+        document.getElementById('paceStatus').innerText = (ry <= 0 && rc <= 0) ? '達成！' : `あと ${ry}円 / ${rc}件`;
+        document.getElementById('listTitle').innerText = `📝 ${baseDateStr.replace(/-/g,'/')} の内訳`;
+    }
+
+    function undo() { if(db.length>0 && confirm('取消？')){ db.pop(); localStorage.setItem('db_goal_v8', JSON.stringify(db)); render(); } }
+    function cp() { navigator.clipboard.writeText(JSON.stringify(db)).then(()=>alert('コピー完了')); }
+    function im() { const i = prompt('データを貼り付け'); if(i){ try{ db=JSON.parse(i); localStorage.setItem('db_goal_v8', JSON.stringify(db)); render(); }catch(e){ alert('形式エラー'); } } }
+    function cl() { if(confirm('全リセット？')){ db=[]; localStorage.setItem('db_goal_v8', JSON.stringify(db)); render(); } }
+    function dl() {
+        let csv = "\uFEFF日付,PF,報酬,チップ,現金,件数\n";
+        db.forEach(r => { csv += `${r.date},${r.pf},${r.fee},${r.bonus},${r.cash},${r.count}\n`; });
+        const b = new Blob([csv], {type:'text/csv'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = "log.csv"; a.click();
+    }
+</script>
+</body>
+</html>

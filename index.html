@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PaceMaker Pro - Stable</title>
+    <title>PaceMaker Pro - AI Edition</title>
     <style>
         :root { --uber: #000; --rocket: #ff5a00; --menu: #ff0044; --wolt: #00c1e8; --bg: #f2f7f5; --acc: #7fb6a4; }
         body { font-family: sans-serif; margin: 0; background: var(--bg); color: #2c3e50; padding-bottom: 50px; }
@@ -20,6 +20,11 @@
         .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .pf-btn { padding: 16px; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
         .history-item { display: flex; justify-content: space-between; padding: 15px; margin-bottom: 8px; background: #fff; border-left: 6px solid; border-radius: 10px; font-weight: bold; }
+        
+        /* --- AI分析用スタイル --- */
+        #ai-btn { width: 100%; padding: 15px; background: linear-gradient(45deg, #4285f4, #34a853); color: white; border: none; border-radius: 12px; font-weight: bold; margin-top: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(66,133,244,0.3); }
+        #ai-response { margin-top: 15px; padding: 15px; background: #e8f0fe; border-radius: 12px; font-size: 0.9rem; line-height: 1.5; display: none; white-space: pre-wrap; border-left: 5px solid #4285f4; }
+        
         #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal-content { background: white; width: 85%; max-width: 380px; border-radius: 20px; padding: 20px; }
         .modal-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; font-weight: bold; }
@@ -37,6 +42,11 @@
         <div class="stat-box" onclick="showAnalysis('week')">今週<b id="wTot">0円</b></div>
         <div class="stat-box" onclick="showAnalysis('cash')">現金<b id="dCsh" style="color:#e67e22;">0円</b></div>
         <div class="stat-box" onclick="showAnalysis('month')">今月<b id="mTot">0円</b></div>
+    </div>
+
+    <div class="card">
+        <button id="ai-btn" onclick="askAi()">✨ AI分析官に相談する</button>
+        <div id="ai-response"></div>
     </div>
 
     <div class="card">
@@ -81,11 +91,44 @@
 </div>
 
 <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbw-6zwmTr3GXDn-4j0kxGlZAkiwxKA98ozSLvVnOlVNL2emdqMXnNreL1B-tarRBvdB/exec";
+    // 先ほどいただいた新しいGAS URL
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxGTtclwKykmDQurmVIerl1SEFfq7oIGs2WZcL_vRoHQyUziQ6YdOh5qwa_EL5a1ue7eQ/exec";
     
     let db = JSON.parse(localStorage.getItem('db_goal_v8')) || [];
     const colors = {Uber:'#000', RocketNow:'#ff5a00', menu:'#ff0044', Wolt:'#00c1e8'};
     let curCnt = 1;
+
+    // --- AI分析ロジック (ルートA: GAS経由) ---
+    async function askAi() {
+        const resDiv = document.getElementById('ai-response');
+        resDiv.style.display = 'block';
+        resDiv.innerText = "AIが本日のデータを分析中...";
+
+        const today = document.getElementById('targetDate').value;
+        const todayData = db.filter(r => r.date === today);
+        
+        if (todayData.length === 0) {
+            resDiv.innerText = "本日のデータがまだありません。配達を記録してから相談してください！";
+            return;
+        }
+
+        const totalFee = todayData.reduce((s, r) => s + r.fee + r.bonus, 0);
+        const totalCount = todayData.reduce((s, r) => s + r.count, 0);
+        
+        const prompt = `あなたは配達の専門家です。本日の実績（報酬合計:${totalFee}円、件数:${totalCount}件）を見て、今後の立ち回りやモチベーションアップのためのアドバイスを200文字以内で短く伝えてください。`;
+
+        try {
+            // mode: "cors" にして返信を受け取れるようにします
+            const response = await fetch(GAS_URL, {
+                method: "POST",
+                body: JSON.stringify({ askAi: true, prompt: prompt })
+            });
+            const text = await response.text();
+            resDiv.innerText = text;
+        } catch (e) {
+            resDiv.innerText = "エラー: AIとの通信に失敗しました。GASのデプロイ設定（アクセス：全員）を確認してください。";
+        }
+    }
 
     function getLogicToday() {
         const d = new Date();

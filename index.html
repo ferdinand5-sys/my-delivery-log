@@ -94,15 +94,18 @@
     // 先ほどいただいた新しいGAS URL
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxGTtclwKykmDQurmVIerl1SEFfq7oIGs2WZcL_vRoHQyUziQ6YdOh5qwa_EL5a1ue7eQ/exec";
     
+    // --- 【重要】新しく作ったRenderのAI基地のURL ---
+    const AI_BASE_URL = "https://ai-base-24uj.onrender.com/ask";
+    
     let db = JSON.parse(localStorage.getItem('db_goal_v8')) || [];
     const colors = {Uber:'#000', RocketNow:'#ff5a00', menu:'#ff0044', Wolt:'#00c1e8'};
     let curCnt = 1;
 
-    // --- AI分析ロジック (ルートA: GAS経由) ---
+    // --- AI分析ロジック (ルートB: Render経由) ---
     async function askAi() {
         const resDiv = document.getElementById('ai-response');
         resDiv.style.display = 'block';
-        resDiv.innerText = "AIが本日のデータを分析中...";
+        resDiv.innerText = "AIが分析中...（初回は1分ほどかかる場合があります）";
 
         const today = document.getElementById('targetDate').value;
         const todayData = db.filter(r => r.date === today);
@@ -115,18 +118,21 @@
         const totalFee = todayData.reduce((s, r) => s + r.fee + r.bonus, 0);
         const totalCount = todayData.reduce((s, r) => s + r.count, 0);
         
-        const prompt = `あなたは配達の専門家です。本日の実績（報酬合計:${totalFee}円、件数:${totalCount}件）を見て、今後の立ち回りやモチベーションアップのためのアドバイスを200文字以内で短く伝えてください。`;
+        const prompt = `あなたは配達の専門家です。本日の実績（報酬合計:${totalFee}円、件数:${totalCount}件）を見て、今後の立ち回りやモチベーションアップのためのアドバイスを200文字以内で短く、フレンドリーに伝えてください。`;
 
         try {
-            // mode: "cors" にして返信を受け取れるようにします
-            const response = await fetch(GAS_URL, {
+            const response = await fetch(AI_BASE_URL, {
                 method: "POST",
-                body: JSON.stringify({ askAi: true, prompt: prompt })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: prompt })
             });
+            
+            if (!response.ok) throw new Error();
+            
             const text = await response.text();
             resDiv.innerText = text;
         } catch (e) {
-            resDiv.innerText = "エラー: AIとの通信に失敗しました。GASのデプロイ設定（アクセス：全員）を確認してください。";
+            resDiv.innerText = "基地がまだ準備中か、APIキーに問題があるようです。数分待ってからもう一度お試しください。";
         }
     }
 

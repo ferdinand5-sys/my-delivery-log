@@ -124,7 +124,7 @@
             const response = await fetch(AI_BASE_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: prompt })
+                body: JSON.stringify({ message: prompt })
             });
             
             if (!response.ok) throw new Error();
